@@ -110,9 +110,12 @@ def test_pack_offsets_roundtrip_and_confirm():
         if x['h'] == 200 and 'p' in x:
             body = gzip.decompress(pack[x['o']: x['o'] + x['n']])
             assert hashlib.sha256(body).hexdigest() == x['s'] and len(body) == x['b']
+    pack_name = [x['name'] for x in plan['order'] if x['name'].endswith('.bin')][0]
     assert up.confirm()['status'] == 'CONFIRMED'
     up2 = u.Uploader(out, CFG, clock=c); plan2 = up2.prepare()
-    assert plan2['newPacks'] == [] and all(x['name'].endswith('.json') or 'MANIFEST' in x['name'] for x in plan2['order'])
+    assert plan2['newPacks'] == []
+    names2 = [x['name'] for x in plan2['order']]
+    assert pack_name in names2  # pack confirmado e recriado a partir do store para o proximo release
     man2 = json.load(open([x['sourcePath'] for x in plan2['order'] if x['name'] == u.STABLE_MANIFEST][0])); assert man2['items'] == man['items']
 
 def test_prepare_twice_without_confirm_relists_same_pack():
@@ -167,6 +170,20 @@ def test_business_days_skips_today_even_weekday():
     d = m.business_days(5, dt.date(2026, 11, 10))
     assert dt.date(2026, 11, 10) not in d
     assert d == [dt.date(2026, 11, 3), dt.date(2026, 11, 4), dt.date(2026, 11, 5), dt.date(2026, 11, 6), dt.date(2026, 11, 9)], d
+
+
+def test_rebuilds_confirmed_pack_from_store_for_next_release():
+    r, calls, c, out = mk(); r.run(CIKS, BY, DAY)
+    up = u.Uploader(out, CFG, clock=c); plan = up.prepare(); pack = plan['order'][0]['name']
+    sha = plan['order'][0]['sha256']
+    assert up.confirm()['status'] == 'CONFIRMED'
+    assert not os.path.exists(os.path.join(out, 'outbox', pack))
+    c.t += 5
+    plan2 = u.Uploader(out, CFG, clock=c).prepare()
+    rebuilt = os.path.join(out, 'outbox', pack)
+    assert os.path.exists(rebuilt)
+    assert hashlib.sha256(open(rebuilt, 'rb').read()).hexdigest() == sha
+    assert pack in [x['name'] for x in plan2['order']]
 
 if __name__ == '__main__':
     n = 0

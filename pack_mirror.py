@@ -92,8 +92,40 @@ class Uploader:
             self.up['packs'][name] = {'status': 'PENDING', 'sha256': sha_file(p), 'bytes': os.path.getsize(p), 'createdUTC': iso(t)}
         return made
 
+    def _rebuild_missing_packs(self):
+        """Recria no outbox packs ja confirmados (apagados apos o upload) a partir do store, mesmos offsets."""
+        by = {}
+        for path, it in self.manifest['items'].items():
+            if it.get('pack') and it.get('store') and 'offset' in it and 'gzBytes' in it:
+                by.setdefault(it['pack'], []).append(it)
+        rebuilt = []
+        for name, members in by.items():
+            dest = os.path.join(self.outbox, name)
+            if os.path.exists(dest):
+                continue
+            members = sorted(members, key=lambda it: it['offset'])
+            tmp = dest + '.tmp'
+            with open(tmp, 'wb') as f:
+                off = 0
+                for it in members:
+                    if it['offset'] != off:
+                        os.remove(tmp)
+                        raise ValueError('PACK_OFFSET_GAP %s at %s' % (name, off))
+                    data = open(os.path.join(self.out, it['store']), 'rb').read()
+                    if len(data) != it['gzBytes']:
+                        os.remove(tmp)
+                        raise ValueError('PACK_MEMBER_SIZE %s' % name)
+                    f.write(data)
+                    off += len(data)
+            os.replace(tmp, dest)
+            rec = self.up['packs'].setdefault(name, {})
+            rec.update(sha256=sha_file(dest), bytes=os.path.getsize(dest), status=rec.get('status') or 'PENDING')
+            rebuilt.append(name)
+        return rebuilt
+
     def prepare(self):
         made = self._pack_new()
+        rebuilt = self._rebuild_missing_packs()
         save(self.mpath, self.manifest)
         t = self.clock()
         live = {n for n, v in self.up['packs'].items()}
