@@ -1,0 +1,60 @@
+# SPS SEC mirror — GitHub Actions (repo publico = minutos gratis).
+# Fair access: 0,5 req/s, para no primeiro 403/429, sem loop de retry, sem trocar IP.
+# O indice do dia corrente (ET) nao e pedido (ainda nao publicado).
+# O User-Agent declarado vive SO no secret SPS_SEC_UA; nunca no codigo nem no manifesto.
+name: sps-sec-mirror
+on:
+  # Agendamento 3x/dia — COMENTADO ate o espelho estar comprovado. Nao descomentar antes disso.
+  # schedule:
+  #   - cron: "0 10,16,22 * * *"   # 10:00, 16:00 e 22:00 UTC
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "proof = indices dos ultimos dias uteis + 3 corpos; full = continua o espelho (pode repetir, sem agenda)"
+        required: true
+        type: choice
+        options:
+          - proof
+          - full
+        default: proof
+permissions:
+  contents: write
+concurrency:
+  group: sps-sec-mirror
+  cancel-in-progress: false
+jobs:
+  mirror:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    env:
+      SPS_SEC_UA: ${{ secrets.SPS_SEC_UA }}
+      SPS_SEC_MIRROR_MODE: ${{ github.event.inputs.mode || 'proof' }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Conferir secret do User-Agent (sem exibir o valor)
+        run: |
+          if [ -z "${SPS_SEC_UA}" ]; then echo "Falta o secret SPS_SEC_UA"; exit 1; fi
+          python3 -c "import os,re,sys; ua=os.environ['SPS_SEC_UA'].strip(); sys.exit(0 if re.fullmatch(r'[A-Za-z0-9][\w .\-/]{2,80} [^\s<>@]+@[^\s<>@]+\.[^\s<>@]+', ua) else 1)"
+          echo "SPS_SEC_UA presente e em formato valido (valor nao exibido)"
+
+      - name: Testes unitarios
+        run: python3 tests/test_mirror.py
+
+      - name: Restaurar estado de rodadas anteriores
+        uses: actions/cache@v4
+        with:
+          path: data
+          key: sec-mirror-${{ runner.os }}-${{ github.run_id }}
+          restore-keys: |
+            sec-mirror-${{ runner.os }}-
+
+      - name: Espelhar SEC
+        run: python3 sec_mirror_t61.py data
+
+      - name: Empacotar packs e manifesto
+        run: python3 pack_mirror.py prepare data
+
+      - name: Publicar no GitHub Release
+        run: python3 publish_release.py data

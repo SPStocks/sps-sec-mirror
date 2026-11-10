@@ -1,0 +1,30 @@
+{
+  "version": "T65_GITHUB_ACTIONS",
+  "origin_id": "sps-gh-actions-mirror-t65",
+  "ciks_file": "ciks.txt",
+  "release_tag_full": "mirror",
+  "release_tag_proof": "proof",
+  "index_only_forms": ["3", "3/A", "4", "4/A", "5", "5/A", "144", "144/A"],
+  "bank_product_forms": ["424B2", "FWP"],
+  "bank_ciks": {
+    "895421": "MS",
+    "19617": "JPM",
+    "886982": "GS",
+    "70858": "BAC",
+    "831001": "C",
+    "1000275": "RY",
+    "72971": "WFC",
+    "1159508": "DB",
+    "96223": "JEF"
+  },
+  "priority0_re": "^(8-K|6-K|10-Q|10-K)(/A)?$",
+  "priority1_re": "^(SCHEDULE 13D|SC 13D|DEFA14A|DEF 14A|DEF14A|425|SC TO|SC 14D)",
+  "index_days_back": 10,
+  "retention_days": 14,
+  "spacing_seconds": 2.0,
+  "max_calls_per_run": 500,
+  "max_requests_per_run": 200,
+  "max_run_seconds": 10000,
+  "max_body_bytes": 41943040,
+  "pack_max_bytes": 41943040
+}

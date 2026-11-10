@@ -1,0 +1,10 @@
+data/
+out/
+outbox/
+.sec_ua
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+.env
+*.tmp
